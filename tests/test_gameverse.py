@@ -1,20 +1,26 @@
 import pytest
 from services.gameverse_service import GameVerseService
 
-def test_check_sufficient_balance():
-    # Use valid wallet ID 2001 which has a balance of 2500.00
-    success, res = GameVerseService.check_sufficient_balance(2001, 10.00)
-    print(f"\n[DEBUG] check_sufficient_balance: success={success}, res={res}")
+def test_get_player_profile():
+    # Use valid player ID 3001 (Alex Chen)
+    success, res = GameVerseService.get_player_profile(3001)
+    print(f"\n[DEBUG] get_player_profile: success={success}, res={res}")
     assert success is True, f"Service failed with error: {res}"
 
-def test_get_low_balance_alerts():
-    # Test low balance alerts with a threshold
-    success, res = GameVerseService.get_low_balance_alerts(500.00)
-    print(f"\n[DEBUG] get_low_balance_alerts: success={success}, res={res}")
+def test_get_wallet_transactions():
+    # Test transaction history for valid wallet 2001
+    success, res = GameVerseService.get_wallet_transactions(2001)
+    print(f"\n[DEBUG] get_wallet_transactions: success={success}, res={res}")
     assert success is True, f"Service failed with error: {res}"
 
-def test_wallet_summary_structure():
-    # Test fetching wallet summary for wallet 2001
-    success, res = GameVerseService.get_wallet_summary(2001)
-    print(f"\n[DEBUG] get_wallet_summary: success={success}, res={res}")
-    assert success is True, f"Service failed with error: {res}"
+def test_record_transaction():
+    # Test recording a new deposit transaction on wallet 2001
+    success, res = GameVerseService.record_transaction(
+        wallet_id=2001,
+        amount=50.00,
+        transaction_type="Deposit",
+        recipient="Self",
+        payment_method="Credit Card"
+    )
+    print(f"\n[DEBUG] record_transaction: success={success}, new_id={res}")
+    assert success is True, f"Failed to record transaction: {res}"
