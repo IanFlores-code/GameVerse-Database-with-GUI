@@ -197,3 +197,321 @@ class GameVerseService:
             "12_months": float(balance) * (1 + monthly_rate * 12)
         }
         return True, projections
+
+    @staticmethod
+    def open_wallet(player_id, wallet_type, hub_id, balance, minimum_balance, bonus_rate, description):
+        conn = DatabaseManager.get_connection()
+        if not conn:
+            return False, "Database connection failed"
+
+        try:
+            with conn:
+                with conn.cursor() as cursor:
+                    cursor.execute("SELECT 1 FROM players WHERE playerid = %s;", (player_id,))
+                    if not cursor.fetchone():
+                        return False, "Player not found"
+
+                    cursor.execute("SELECT 1 FROM gaminghubs WHERE hubid = %s;", (hub_id,))
+                    if not cursor.fetchone():
+                        return False, "Gaming hub not found"
+
+                    cursor.execute(
+                        """
+                        INSERT INTO wallets (
+                            walletid, wallettype, hubid, balance, bonusrate,
+                            walletdescription, opendate, minimumbalance, isactive
+                        )
+                        VALUES (
+                            (SELECT COALESCE(MAX(walletid), 0) + 1 FROM wallets),
+                            %s, %s, %s, %s, %s, CURRENT_DATE, %s, TRUE
+                        )
+                        RETURNING walletid;
+                        """,
+                        (wallet_type, hub_id, balance, bonus_rate, description, minimum_balance),
+                    )
+                    wallet_id = cursor.fetchone()[0]
+
+                    cursor.execute(
+                        """
+                        INSERT INTO walletholders (walletid, playerid, holderrole)
+                        VALUES (%s, %s, 'Owner');
+                        """,
+                        (wallet_id, player_id),
+                    )
+
+            return True, wallet_id
+        except Exception as e:
+            err_msg = getattr(e, "pgerror", None) or str(e)
+            err_msg = err_msg.split("\n")[0].replace("ERROR:  ", "")
+            return False, f"Failed to open wallet: {err_msg}"
+        finally:
+            conn.close()
+
+    @staticmethod
+    def update_wallet(wallet_id, bonus_rate, description):
+        query = """
+                UPDATE wallets
+                SET bonusrate = %s, walletdescription = %s
+                WHERE walletid = %s
+                RETURNING walletid;
+            """
+        success, result = DatabaseManager.execute_query(
+            query, (bonus_rate, description, wallet_id), fetch=True
+        )
+        if success and result:
+            return True, result[0][0]
+        if success:
+            return False, "Wallet not found"
+        return False, result
+
+    @staticmethod
+    def set_wallet_active(wallet_id, active):
+        query = """
+                UPDATE wallets
+                SET isactive = %s
+                WHERE walletid = %s
+                RETURNING walletid;
+            """
+        success, result = DatabaseManager.execute_query(
+            query, (bool(active), wallet_id), fetch=True
+        )
+        if success and result:
+            return True, result[0][0]
+        if success:
+            return False, "Wallet not found"
+        return False, result
+
+    @staticmethod
+    def wallet_inventory():
+        query = """
+                SELECT
+                    wallettype,
+                    COUNT(*) AS wallet_count,
+                    COUNT(*) FILTER (WHERE isactive) AS active_count,
+                    COALESCE(SUM(balance), 0) AS total_balance,
+                    COALESCE(AVG(balance), 0) AS avg_balance
+                FROM wallets
+                GROUP BY wallettype
+                ORDER BY wallettype;
+            """
+        success, result = DatabaseManager.execute_query(query, fetch=True)
+        if success:
+            return True, result
+        return False, result or "Failed to load wallet inventory"
+
+    @staticmethod
+    def open_wallet(player_id, wallet_type, hub_id, balance, minimum_balance, bonus_rate, description):
+        conn = DatabaseManager.get_connection()
+        if not conn:
+            return False, "Database connection failed"
+
+        try:
+            with conn:
+                with conn.cursor() as cursor:
+                    cursor.execute("SELECT 1 FROM players WHERE playerid = %s;", (player_id,))
+                    if not cursor.fetchone():
+                        return False, "Player not found"
+
+                    cursor.execute("SELECT 1 FROM gaminghubs WHERE hubid = %s;", (hub_id,))
+                    if not cursor.fetchone():
+                        return False, "Gaming hub not found"
+
+                    cursor.execute(
+                        """
+                        INSERT INTO wallets (
+                            walletid, wallettype, hubid, balance, bonusrate,
+                            walletdescription, opendate, minimumbalance, isactive
+                        )
+                        VALUES (
+                            (SELECT COALESCE(MAX(walletid), 0) + 1 FROM wallets),
+                            %s, %s, %s, %s, %s, CURRENT_DATE, %s, TRUE
+                        )
+                        RETURNING walletid;
+                        """,
+                        (wallet_type, hub_id, balance, bonus_rate, description, minimum_balance),
+                    )
+                    wallet_id = cursor.fetchone()[0]
+
+                    cursor.execute(
+                        """
+                        INSERT INTO walletholders (walletid, playerid, holderrole, joindate, depositamount)
+                        VALUES (%s, %s, 'Owner', CURRENT_DATE, %s);
+                        """,
+                        (wallet_id, player_id, balance),
+                    )
+
+            return True, wallet_id
+        except Exception as e:
+            err_msg = getattr(e, "pgerror", None) or str(e)
+            err_msg = err_msg.split("\n")[0].replace("ERROR:  ", "")
+            return False, f"Failed to open wallet: {err_msg}"
+        finally:
+            conn.close()
+
+    @staticmethod
+    def update_wallet(wallet_id, bonus_rate, description):
+        query = """
+                UPDATE wallets
+                SET bonusrate = %s, walletdescription = %s
+                WHERE walletid = %s
+                RETURNING walletid;
+            """
+        success, result = DatabaseManager.execute_query(
+            query, (bonus_rate, description, wallet_id), fetch=True
+        )
+        if success and result:
+            return True, result[0][0]
+        if success:
+            return False, "Wallet not found"
+        return False, result
+
+    @staticmethod
+    def set_wallet_active(wallet_id, active):
+        query = """
+                UPDATE wallets
+                SET isactive = %s
+                WHERE walletid = %s
+                RETURNING walletid;
+            """
+        success, result = DatabaseManager.execute_query(
+            query, (bool(active), wallet_id), fetch=True
+        )
+        if success and result:
+            return True, result[0][0]
+        if success:
+            return False, "Wallet not found"
+        return False, result
+
+    @staticmethod
+    def wallet_inventory():
+        query = """
+                SELECT
+                    wallettype,
+                    COUNT(*) AS wallet_count,
+                    COUNT(*) FILTER (WHERE isactive) AS active_count,
+                    COALESCE(SUM(balance), 0) AS total_balance,
+                    COALESCE(AVG(balance), 0) AS avg_balance
+                FROM wallets
+                GROUP BY wallettype
+                ORDER BY wallettype;
+            """
+        success, result = DatabaseManager.execute_query(query, fetch=True)
+        if success:
+            return True, result
+        return False, result or "Failed to load wallet inventory"
+
+    @staticmethod
+    def add_hub(hub_name, location):
+        query = """
+                INSERT INTO gaminghubs (hubid, hubname, location, isactive)
+                VALUES (
+                    (SELECT COALESCE(MAX(hubid), 0) + 1 FROM gaminghubs),
+                    %s, %s, TRUE
+                )
+                RETURNING hubid;
+            """
+        success, result = DatabaseManager.execute_query(query, (hub_name, location), fetch=True)
+        if success and result:
+            return True, result[0][0]
+        return False, result or "Failed to add hub"
+
+    @staticmethod
+    def update_hub(hub_id, hub_name, location):
+        query = """
+                UPDATE gaminghubs
+                SET hubname = %s, location = %s
+                WHERE hubid = %s
+                RETURNING hubid;
+            """
+        success, result = DatabaseManager.execute_query(
+            query, (hub_name, location, hub_id), fetch=True
+        )
+        if success and result:
+            return True, result[0][0]
+        if success:
+            return False, "Hub not found"
+        return False, result
+
+    @staticmethod
+    def set_hub_active(hub_id, active):
+        conn = DatabaseManager.get_connection()
+        if not conn:
+            return False, "Database connection failed"
+
+        try:
+            with conn:
+                with conn.cursor() as cursor:
+                    if not active:
+                        cursor.execute(
+                            "SELECT COUNT(*) FROM wallets WHERE hubid = %s AND isactive = TRUE;",
+                            (hub_id,),
+                        )
+                        active_wallets = cursor.fetchone()[0]
+                        if active_wallets > 0:
+                            return False, "Cannot deactivate hub with active wallets"
+
+                    cursor.execute(
+                        """
+                        UPDATE gaminghubs
+                        SET isactive = %s
+                        WHERE hubid = %s
+                        RETURNING hubid;
+                        """,
+                        (bool(active), hub_id),
+                    )
+                    row = cursor.fetchone()
+                    if not row:
+                        return False, "Hub not found"
+            return True, row[0]
+        except Exception as e:
+            err_msg = getattr(e, "pgerror", None) or str(e)
+            err_msg = err_msg.split("\n")[0].replace("ERROR:  ", "")
+            return False, f"Failed to update hub status: {err_msg}"
+        finally:
+            conn.close()
+
+    @staticmethod
+    def get_hub_details(hub_id):
+        query = """
+                SELECT
+                    h.hubid,
+                    h.hubname,
+                    h.location,
+                    h.isactive,
+                    COUNT(w.walletid) AS wallet_count,
+                    COUNT(w.walletid) FILTER (WHERE w.isactive) AS active_wallets,
+                    COALESCE(SUM(w.balance), 0) AS total_balance,
+                    COALESCE(AVG(w.bonusrate), 0) AS avg_bonus_rate
+                FROM gaminghubs h
+                LEFT JOIN wallets w ON w.hubid = h.hubid
+                WHERE h.hubid = %s
+                GROUP BY h.hubid, h.hubname, h.location, h.isactive;
+            """
+        success, result = DatabaseManager.execute_query(query, (hub_id,), fetch=True)
+        if success and result:
+            return True, result[0]
+        if success:
+            return False, "Hub not found"
+        return False, result
+
+    @staticmethod
+    def hub_summary_report():
+        query = """
+                SELECT
+                    h.hubid,
+                    h.hubname,
+                    h.location,
+                    h.isactive,
+                    COUNT(w.walletid) AS wallet_count,
+                    COUNT(w.walletid) FILTER (WHERE w.isactive) AS active_wallets,
+                    COALESCE(SUM(w.balance), 0) AS total_balance,
+                    COALESCE(AVG(w.bonusrate), 0) AS avg_bonus_rate
+                FROM gaminghubs h
+                LEFT JOIN wallets w ON w.hubid = h.hubid
+                GROUP BY h.hubid, h.hubname, h.location, h.isactive
+                ORDER BY h.hubid;
+            """
+        success, result = DatabaseManager.execute_query(query, fetch=True)
+        if success:
+            return True, result
+        return False, result or "Failed to load hub summary report"

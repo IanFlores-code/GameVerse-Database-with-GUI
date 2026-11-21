@@ -96,24 +96,52 @@ def search_hubs(term: str, active_only: bool = True) -> list[dict]:
     ]
 
 
-def get_hub_details(hubid: int) -> dict:
-    _not_implemented("get_hub_details")
-
-
 def add_hub(hubname: str, location: str) -> int:
-    _not_implemented("add_hub")
+    ok, hub_id = GameVerseService.add_hub(hubname, location)
+    return int(_unwrap(ok, hub_id))
 
 
 def update_hub(hubid: int, hubname: str, location: str) -> None:
-    _not_implemented("update_hub")
+    ok, res = GameVerseService.update_hub(hubid, hubname, location)
+    _unwrap(ok, res)
 
 
 def set_hub_active(hubid: int, active: bool) -> None:
-    _not_implemented("set_hub_active")
+    ok, res = GameVerseService.set_hub_active(hubid, active)
+    _unwrap(ok, res)
+
+
+def get_hub_details(hubid: int) -> dict:
+    ok, row = GameVerseService.get_hub_details(hubid)
+    r = _unwrap(ok, row)
+    return {
+        "hubid": r[0],
+        "hubname": r[1],
+        "location": r[2],
+        "isactive": r[3],
+        "wallet_count": r[4],
+        "active_wallets": r[5],
+        "total_balance": r[6],
+        "avg_bonus_rate": r[7],
+    }
 
 
 def hub_summary_report() -> list[dict]:
-    _not_implemented("hub_summary_report")
+    ok, rows = GameVerseService.hub_summary_report()
+    data = _unwrap(ok, rows)
+    return [
+        {
+            "hubid": r[0],
+            "hubname": r[1],
+            "location": r[2],
+            "isactive": r[3],
+            "wallet_count": r[4],
+            "active_wallets": r[5],
+            "total_balance": r[6],
+            "avg_bonus_rate": r[7],
+        }
+        for r in data
+    ]
 
 
 # ---------------------------------------------------------------- wallets
@@ -226,20 +254,37 @@ def low_balance_alerts(threshold: Decimal, playerid: int | None = None) -> list[
 
 def open_wallet(playerid: int, wallettype: str, hubid: int, balance: Decimal,
                 minimumbalance: Decimal, bonusrate: Decimal, description: str) -> int:
-    _not_implemented("open_wallet")
+    """Creates Wallets + Owner WalletHolders row atomically. -> new walletid."""
+    ok, wallet_id = GameVerseService.open_wallet(
+        playerid, wallettype, hubid, balance, minimumbalance, bonusrate, description
+    )
+    return int(_unwrap(ok, wallet_id))
 
 
 def update_wallet(walletid: int, bonusrate: Decimal, description: str) -> None:
-    _not_implemented("update_wallet")
+    ok, res = GameVerseService.update_wallet(walletid, bonusrate, description)
+    _unwrap(ok, res)
 
 
 def set_wallet_active(walletid: int, active: bool) -> None:
-    _not_implemented("set_wallet_active")
+    ok, res = GameVerseService.set_wallet_active(walletid, active)
+    _unwrap(ok, res)
 
 
 def wallet_inventory() -> list[dict]:
-    _not_implemented("wallet_inventory")
-
+    """Wallets grouped by type: wallettype, wallet_count, active_count, total_balance, avg_balance."""
+    ok, rows = GameVerseService.wallet_inventory()
+    data = _unwrap(ok, rows)
+    return [
+        {
+            "wallettype": r[0],
+            "wallet_count": r[1],
+            "active_count": r[2],
+            "total_balance": r[3],
+            "avg_balance": r[4],
+        }
+        for r in data
+    ]
 
 # ---------------------------------------------------------------- players
 def list_players() -> list[dict]:
