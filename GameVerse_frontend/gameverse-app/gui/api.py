@@ -318,6 +318,8 @@ def get_player(playerid: int) -> dict:
         "email": data[3],
         "phone": data[4],
         "isactive": data[5],
+        "dateofbirth": data[6],
+        "registrationdate": data[7],
     }
 
 
@@ -336,7 +338,8 @@ def update_player_contact(playerid: int, email: str, phone: str) -> None:
 
 
 def set_player_active(playerid: int, active: bool) -> None:
-    _not_implemented("set_player_active")
+    ok, res = GameVerseService.set_player_active(playerid, active)
+    _unwrap(ok, res)
 
 
 def player_memberships(playerid: int) -> list[dict]:
@@ -445,20 +448,31 @@ def wallet_transactions(walletid: int, date_from: date | None = None,
     return txns
 
 
-def totals_by_payment_method(walletid: int | None = None,
-                             playerid: int | None = None) -> list[dict]:
-    _not_implemented("totals_by_payment_method")
+def reverse_transaction(transactionid: int) -> int:
+    ok, rev_id = GameVerseService.reverse_transaction(transactionid)
+    return int(_unwrap(ok, rev_id))
 
 
-def reverse_transaction(transactionid: int) -> list[int]:
-    _not_implemented("reverse_transaction")
+def totals_by_payment_method() -> list[dict]:
+    ok, rows = GameVerseService.totals_by_payment_method()
+    data = _unwrap(ok, rows)
+    return [
+        {
+            "paymentmethod": r[0],
+            "tx_count": r[1],
+            "net_amount": r[2],
+            "total_amount": r[3],
+        }
+        for r in data
+    ]
 
 
 # ---------------------------------------------------------------- reviews
 def add_review(playerid: int, walletid: int, rating: int, reviewtext: str) -> int:
-    ok, msg = GameVerseService.submit_wallet_review(playerid, walletid, rating, comment=reviewtext)
-    _unwrap(ok, msg)
-    return 0
+    ok, review_id = GameVerseService.submit_wallet_review(
+        playerid, walletid, rating, comment=reviewtext
+    )
+    return int(_unwrap(ok, review_id))
 
 
 def list_reviews(walletid: int | None = None) -> list[dict]:
@@ -488,7 +502,8 @@ def list_reviews(walletid: int | None = None) -> list[dict]:
 
 
 def set_review_verified(reviewid: int, verified: bool) -> None:
-    _not_implemented("set_review_verified")
+    ok, res = GameVerseService.set_review_verified(reviewid, verified)
+    _unwrap(ok, res)
 
 
 def avg_rating_by_wallet_type() -> list[dict]:

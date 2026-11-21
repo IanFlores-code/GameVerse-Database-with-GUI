@@ -31,7 +31,10 @@ class GameVerseService:
 
     @staticmethod
     def get_player_profile(player_id):
-        query = "SELECT playerid, firstname, lastname, email, phone, isactive FROM players WHERE playerid = %s;"
+        query = (
+            "SELECT playerid, firstname, lastname, email, phone, isactive, "
+            "dateofbirth, registrationdate FROM players WHERE playerid = %s;"
+        )
         success, result = DatabaseManager.execute_query(query, (player_id,), fetch=True)
         if success and result:
             return True, result[0]
@@ -152,20 +155,27 @@ class GameVerseService:
 
     @staticmethod
     def submit_wallet_review(player_id, wallet_id, rating, comment=None):
-        # Check if player already reviewed this wallet
         check_query = "SELECT 1 FROM walletreviews WHERE playerid = %s AND walletid = %s;"
-        success, result = DatabaseManager.execute_query(check_query, (player_id, wallet_id), fetch=True)
-        if success and result:
+        ok, existing = DatabaseManager.execute_query(check_query, (player_id, wallet_id), fetch=True)
+        if ok and existing:
             return False, "Duplicate review rejected: You have already reviewed this wallet."
 
         insert_query = """
-            INSERT INTO walletreviews (playerid, walletid, rating, comment, reviewdate)
-            VALUES (%s, %s, %s, %s, CURRENT_DATE);
-        """
-        success, res = DatabaseManager.execute_query(insert_query, (player_id, wallet_id, rating, comment))
-        if success:
-            return True, "Review submitted successfully."
-        return False, "Failed to submit review."
+                INSERT INTO walletreviews (
+                    reviewid, playerid, walletid, rating, reviewtext, reviewdate, isverified
+                )
+                VALUES (
+                    (SELECT COALESCE(MAX(reviewid), 0) + 1 FROM walletreviews),
+                    %s, %s, %s, %s, CURRENT_DATE, FALSE
+                )
+                RETURNING reviewid;
+            """
+        success, result = DatabaseManager.execute_query(
+            insert_query, (player_id, wallet_id, rating, comment), fetch=True
+        )
+        if success and result:
+            return True, result[0][0]
+        return False, result or "Failed to submit review."
 
     @staticmethod
     def get_average_rating_per_wallet_type():
@@ -515,3 +525,135 @@ class GameVerseService:
         if success:
             return True, result
         return False, result or "Failed to load hub summary report"
+
+    @staticmethod
+    def reverse_transaction(transaction_id):
+        conn = DatabaseManager.get_connection()
+        if not conn:
+            return False, "Database connection failed"
+
+        try:
+            with conn:
+                with conn.cursor() as cursor:
+                    cursor.execute(
+                        """
+                        SELECT transactionid, walletid, amount, transactiontype, recipient, paymentmethod
+                        FROM gametransactions
+                        WHERE transactionid = %s
+                        FOR UPDATE;
+                        """,
+                        (transaction_id,),
+                    )
+                    row = cursor.fetchone()
+                    if not row:
+                        return False, "Transaction not found"
+
+                    _, wallet_id, amount, tx_type, _, payment_method = row
+
+                    if tx_type == "Reversal":
+                        return False, "Cannot reverse a reversal transaction"
+
+                    marker = f"Reversal of #{transaction_id}"
+                    cursor.execute(
+                        """
+                        SELECT 1 FROM gametransactions
+                        WHERE walletid = %s AND transactiontype = 'Reversal' AND recipient = %s;
+                        """,
+                        (wallet_id, marker),
+                    )
+                    if cursor.fetchone():
+                        return False, f"Transaction #{transaction_id} has already been reversed"
+
+                    cursor.execute(
+                        "SELECT balance, minimumbalance FROM wallets WHERE walletid = %s FOR UPDATE;",
+                        (wallet_id,),
+                    )
+                    wallet_row = cursor.fetchone()
+                    if not wallet_row:
+                        return False, "Wallet not found"
+
+                    current_balance, min_balance = wallet_row
+                    reversal_amount = -amount
+                    new_balance = current_balance + reversal_amount
+
+                    if new_balance < min_balance:
+                        return False, "Reversal would drop wallet balance below minimum balance"
+
+                    cursor.execute(
+                        "UPDATE wallets SET balance = %s WHERE walletid = %s;",
+                        (new_balance, wallet_id),
+                    )
+                    cursor.execute(
+                        """
+                        INSERT INTO gametransactions (
+                            transactionid, walletid, transactiondate, amount,
+                            transactiontype, recipient, paymentmethod
+                        )
+                        VALUES (
+                            (SELECT COALESCE(MAX(transactionid), 0) + 1 FROM gametransactions),
+                            %s, CURRENT_DATE, %s, 'Reversal', %s, %s
+                        )
+                        RETURNING transactionid;
+                        """,
+                        (wallet_id, reversal_amount, marker, payment_method),
+                    )
+                    rev_id = cursor.fetchone()[0]
+
+            return True, rev_id
+        except Exception as e:
+            err_msg = getattr(e, "pgerror", None) or str(e)
+            err_msg = err_msg.split("\n")[0].replace("ERROR:  ", "")
+            return False, f"Failed to reverse transaction: {err_msg}"
+        finally:
+            conn.close()
+
+    @staticmethod
+    def totals_by_payment_method():
+        query = """
+                SELECT
+                    COALESCE(paymentmethod, 'Unspecified') AS payment_method,
+                    COUNT(*) AS tx_count,
+                    COALESCE(SUM(amount), 0) AS net_amount,
+                    COALESCE(SUM(ABS(amount)), 0) AS gross_volume
+                FROM gametransactions
+                GROUP BY COALESCE(paymentmethod, 'Unspecified')
+                ORDER BY gross_volume DESC, payment_method;
+            """
+        success, result = DatabaseManager.execute_query(query, fetch=True)
+        if success:
+            return True, result
+        return False, result or "Failed to load totals by payment method"
+
+    @staticmethod
+    def set_player_active(player_id, active):
+        query = """
+                UPDATE players
+                SET isactive = %s
+                WHERE playerid = %s
+                RETURNING playerid;
+            """
+        success, result = DatabaseManager.execute_query(
+            query, (bool(active), player_id), fetch=True
+        )
+        if success and result:
+            return True, result[0][0]
+        if success:
+            return False, "Player not found"
+        return False, result
+
+    @staticmethod
+    def set_review_verified(review_id, verified):
+        query = """
+                UPDATE walletreviews
+                SET isverified = %s
+                WHERE reviewid = %s
+                RETURNING reviewid;
+            """
+        success, result = DatabaseManager.execute_query(
+            query, (bool(verified), review_id), fetch=True
+        )
+        if success and result:
+            return True, result[0][0]
+        if success:
+            return False, "Review not found"
+        return False, result
