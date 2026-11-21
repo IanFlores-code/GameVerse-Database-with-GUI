@@ -9,8 +9,8 @@ NEED INSTALLED
 
 1. SET UP THE DATABASE (pgAdmin or psql)
 ----------------------------------------
-a) Open pgAdmin 4, right-click Databases > Create > Database, and name it: gameverse
-b) Click gameverse > Tools > Query Tool
+a) Open pgAdmin 4, right-click Databases > Create > Database, and name it: GameVerse
+b) Click GameVerse > Tools > Query Tool
 c) Open the root file  gameverse_schema.sql  and execute it (F5)
 d) Verify the schema and seed data loaded:
       SELECT COUNT(*) FROM gameverse.wallets;
@@ -32,11 +32,11 @@ Make a copy of  config/config_template.py  and save it as  config/config.py
 Open  config/config.py  and update DB_CONFIG with your local PostgreSQL credentials:
 
    DB_CONFIG = {
-       "dbname": "gameverse",
+       "host": "localhost",
+       "port": "5432",
+       "database": "GameVerse",
        "user": "postgres",
        "password": "your_postgres_password",
-       "host": "localhost",
-       "port": 5432,
    }
 
 
@@ -68,8 +68,8 @@ From the repository root folder:
 
 IF IT DOESN'T WORK
 ------------------
-"Database connection failed"  -> Wrong password, port, or dbname in config/config.py, or PostgreSQL service is stopped
-"relation ... does not exist" -> Step 1 (gameverse_schema.sql) was not run on the gameverse database
+"Database connection failed"  -> Wrong password, port, or database name in config/config.py, or PostgreSQL service is stopped
+"relation ... does not exist" -> Step 1 (gameverse_schema.sql) was not run on the GameVerse database
 "No module named 'services'"  -> Make sure you run from the repo root with PYTHONPATH set (Step 4)
 "No module named 'psycopg2'"  -> Re-run Step 2 to install requirements.txt
 Admin login fails             -> Use username: admin and password: admin
@@ -77,4 +77,4 @@ Admin login fails             -> Use username: admin and password: admin
 
 START OVER WITH FRESH DATA
 --------------------------
-Close the app, drop/recreate the  gameverse  database in pgAdmin (or psql), and re-run Step 1.
+Close the app, drop/recreate the  GameVerse  database in pgAdmin (or psql), and re-run Step 1.
