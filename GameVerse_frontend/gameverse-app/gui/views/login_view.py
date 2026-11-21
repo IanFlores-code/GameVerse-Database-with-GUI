@@ -60,7 +60,7 @@ class LoginView(tk.Frame):
         self.register_row.pack(anchor="w", pady=(18, 0))
         ttk.Label(self.register_row, text="New player?", style="CardMuted.TLabel").pack(side="left")
         ttk.Button(self.register_row, text="Create an account", style="Link.TButton",
-                   command=self._register).pack(side="left", padx=(6, 0))
+                   command=self._open_register).pack(side="left", padx=(6, 0))
 
         self.bind_all("<Return>", self._enter, add="+")
         self.ident_entry.focus_set()
@@ -99,7 +99,7 @@ class LoginView(tk.Frame):
             return
         self._on_login(Session.from_login(data))
 
-    def _register(self):
+    def _open_register(self):
         fields = [
             Field("firstname", "First name", parse=validators.text(100)),
             Field("lastname", "Last name", parse=validators.text(100)),
