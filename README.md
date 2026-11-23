@@ -1,80 +1,115 @@
-﻿GAMEVERSE WALLET MANAGER - HOW TO RUN
+GAMEVERSE WALLET MANAGER - HOW TO RUN
 =====================================
+
+IMPORTANT
+--------------
+The documentation and screenshots are in GameVerse_frontend\gameverse-app\docs\
 
 NEED INSTALLED
 --------------
-- PostgreSQL 18 (or PostgreSQL 10+) + pgAdmin 4
+- PostgreSQL + pgAdmin 4
 - Python 3.10 or newer (Windows: tick "Add Python to PATH" when installing)
 
 
-1. SET UP THE DATABASE (pgAdmin or psql)
-----------------------------------------
-a) Open pgAdmin 4, right-click Databases > Create > Database, and name it: GameVerse
-b) Click GameVerse > Tools > Query Tool
-c) Open the root file  gameverse_schema.sql  and execute it (F5)
-d) Verify the schema and seed data loaded:
-      SELECT COUNT(*) FROM gameverse.wallets;
-
-   (Do NOT run sql/setup_gameverse_pgadmin.sql — that file was for the legacy frontend stub.)
-
-
-2. INSTALL PYTHON PACKAGES (one time)
--------------------------------------
-Open a terminal in the repository root folder (GameVerse-Database-with-GUI) and run:
-
-   Windows:   python -m pip install -r GameVerse_frontend\gameverse-app\requirements.txt
-   Mac/Linux: python3 -m pip install -r GameVerse_frontend/gameverse-app/requirements.txt
-
-
-3. CONFIGURE DATABASE CONNECTION (one time)
+1. SET UP THE DATABASE (pgAdmin) - one time
 -------------------------------------------
-Make a copy of  config/config_template.py  and save it as  config/config.py
-Open  config/config.py  and update DB_CONFIG with your local PostgreSQL credentials:
+a) Right-click Databases > Create > Database. Name it: GameVerse
+b) Click GameVerse > Tools > Query Tool
+c) Open the file  gameverse_setup.sql  (repository root) and press F5
+d) Check it worked:   SELECT COUNT(*) FROM gameverse.wallets;
+   It should return 15.
 
-   DB_CONFIG = {
-       "host": "localhost",
-       "port": "5432",
-       "database": "GameVerse",
-       "user": "postgres",
-       "password": "your_postgres_password",
-   }
+   gameverse_setup.sql = the Assignment 2/3 schema and data + the stored
+   functions, triggers and login accounts. It is the only SQL file to run.
+   (gameverse_schema.sql is the raw pg_dump; pgAdmin cannot run it and
+   reports  syntax error at or near "8001".)
+
+   Already set up a GameVerse database earlier with
+   sql/setup_gameverse_pgadmin.sql? It is the same, so you can keep it.
+
+
+2. INSTALL PYTHON PACKAGES - one time
+-------------------------------------
+Open a terminal in the repository root (the folder with config, db, services) and run:
+
+   Windows:  py -m pip install -r requirements.txt
+   Mac:      python3 -m pip install -r requirements.txt
+
+
+3. ADD YOUR DATABASE PASSWORD - one time
+----------------------------------------
+Copy  config\config_template.py  to  config\config.py
+
+   Windows:  copy config\config_template.py config\config.py
+   Mac:      cp config/config_template.py config/config.py
+
+Open config\config.py and replace YOUR_PASSWORD_HERE with your PostgreSQL
+password (keep the quotes). The database name is already GameVerse.
+config.py is in .gitignore, so your password is never committed.
 
 
 4. RUN THE APP
 --------------
-From the repository root folder (GameVerse-Database-with-GUI):
+From the repository root, set PYTHONPATH and start main.py:
 
-   Windows (PowerShell):
-      $env:PYTHONPATH=".;GameVerse_frontend\gameverse-app"; python GameVerse_frontend\gameverse-app\main.py
+   PowerShell:      $env:PYTHONPATH=".;GameVerse_frontend\gameverse-app"; python GameVerse_frontend\gameverse-app\main.py
+   Command Prompt:  set PYTHONPATH=.;GameVerse_frontend\gameverse-app
+                    python GameVerse_frontend\gameverse-app\main.py
+   Mac/Linux:       PYTHONPATH=".:GameVerse_frontend/gameverse-app" python3 GameVerse_frontend/gameverse-app/main.py
 
-   Mac/Linux:
-      PYTHONPATH=".:GameVerse_frontend/gameverse-app" python3 GameVerse_frontend/gameverse-app/main.py
+(main.py also adds these folders itself, so the app still starts if PYTHONPATH is not set.)
 
 
 5. LOG IN
 ---------
-   Admin:   Admin tab   ->  admin  /  admin
-   Player:  Player tab  ->  Use any registered player email & password from gameverse.players
-                            (or click "Create account" on the Login screen to register a new player)
+   Admin:   Admin tab   ->  admin  /  Admin@123
+   Player:  Player tab  ->  alex.chen@gameverse.com  /  player123
+
+   Every seeded player's password is player123. New players can sign up with
+   "Create an account". Passwords are stored as bcrypt hashes.
+
+   Good accounts for testing:
+     alex.chen@gameverse.com      Owner of wallets 2001 and 2002
+     bianca.ruiz@gameverse.com    Co-Owner of 2002 and 2007
+     carlos.nguyen@gameverse.com  Member of 2012 (can view, cannot transact)
 
 
-6. RUN AUTOMATED TESTS (optional)
----------------------------------
-From the repository root folder:
+6. RUN THE TESTS
+----------------
+From the repository root:
 
-   Windows (PowerShell):
-      $env:PYTHONPATH=".;GameVerse_frontend\gameverse-app"; pytest
+   PowerShell:  $env:PYTHONPATH=".;GameVerse_frontend\gameverse-app"; pytest -v tests\test_gameverse.py
+   Mac/Linux:   PYTHONPATH=".:GameVerse_frontend/gameverse-app" pytest -v tests/test_gameverse.py
+
+That runs the 17 business-rule tests (they need the database). Plain "pytest" from the
+root runs those plus the 23 GUI input tests. The tests clean up after themselves,
+so they can be run again and again.
+
+
+PROJECT LAYOUT
+--------------
+   gameverse_setup.sql          database: schema, data, functions, triggers
+   config/                      connection settings (config.py is yours, not committed)
+   db/db_manager.py             one reused connection, readable error messages
+   services/gameverse_service.py  backend: calls the stored functions, access checks
+   GameVerse_frontend/gameverse-app/
+       main.py                  start the app here
+       gui/api.py               bridge between the screens and the service layer
+       gui/views/               one file per screen
+   tests/                       business-rule tests (pytest)
 
 
 IF IT DOESN'T WORK
 ------------------
-"Database connection failed"  -> Wrong password, port, or database name in config/config.py, or PostgreSQL service is stopped
-"relation ... does not exist" -> Step 1 (gameverse_schema.sql) was not run on the GameVerse database
-"No module named 'services'"  -> Make sure you run from the repo root with PYTHONPATH set (Step 4)
-"No module named 'psycopg2'"  -> Re-run Step 2 to install requirements.txt
-Admin login fails             -> Use username: admin and password: admin
+"Database connection failed"   -> wrong password or database name in config/config.py,
+                                  or PostgreSQL is not running
+"schema is missing tables"     -> step 1 was not run on the database named in config.py
+"function crypt(...) does not exist" or login always fails
+                               -> step 1 was not run on that database
+"No module named psycopg2"     -> redo step 2
+"py is not recognized"         -> try "python" instead of "py"
 
 
 START OVER WITH FRESH DATA
 --------------------------
-Close the app, drop/recreate the  GameVerse  database in pgAdmin (or psql), and re-run Step 1.
+Close the app, delete the GameVerse database in pgAdmin, then redo step 1.
